@@ -13,13 +13,14 @@
 
 use test::Bencher;
 
-use prometheus::{Opts, Gauge, GaugeVec};
+use prometheus::{Gauge, GaugeVec, Opts};
 
 #[bench]
 fn bench_gauge_with_label_values(b: &mut Bencher) {
-    let gauge = GaugeVec::new(Opts::new("benchmark_gauge", "A gauge to benchmark it."),
-                              &["one", "two", "three"])
-        .unwrap();
+    let gauge = GaugeVec::new(
+        Opts::new("benchmark_gauge", "A gauge to benchmark it."),
+        &["one", "two", "three"],
+    ).unwrap();
     b.iter(|| gauge.with_label_values(&["eins", "zwei", "drei"]).inc())
 }
 

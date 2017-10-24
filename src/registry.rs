@@ -14,13 +14,13 @@
 
 use std::sync::{Arc, RwLock};
 use std::iter::FromIterator;
-use std::collections::{HashMap, BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::collections::btree_map::Entry as BEntry;
 use std::collections::hash_map::Entry as HEntry;
 
 use proto;
 use metrics::Collector;
-use errors::{Result, Error};
+use errors::{Error, Result};
 
 struct RegistryCore {
     pub colloctors_by_id: HashMap<u64, Box<Collector>>,
@@ -37,22 +37,27 @@ impl RegistryCore {
             // Is the desc_id unique?
             // (In other words: Is the fqName + constLabel combination unique?)
             if self.desc_ids.contains(&desc.id) {
-                return Err(Error::Msg(format!("descriptor {:?} already exists with the same \
-                                               fully-qualified name and const label values",
-                                              desc)));
+                return Err(Error::Msg(format!(
+                    "descriptor {:?} already exists with the same \
+                     fully-qualified name and const label values",
+                    desc
+                )));
             }
 
             if let Some(hash) = self.dim_hashes_by_name.get(&desc.fq_name) {
                 if *hash != desc.dim_hash {
-                    return Err(Error::Msg(format!("a previously registered descriptor with the \
-                                                   same fully-qualified name as {:?} has \
-                                                   different label names or a different help \
-                                                   string",
-                                                  desc)));
+                    return Err(Error::Msg(format!(
+                        "a previously registered descriptor with the \
+                         same fully-qualified name as {:?} has \
+                         different label names or a different help \
+                         string",
+                        desc
+                    )));
                 }
             }
 
-            self.dim_hashes_by_name.insert(desc.fq_name.clone(), desc.dim_hash);
+            self.dim_hashes_by_name
+                .insert(desc.fq_name.clone(), desc.dim_hash);
 
             // If it is not a duplicate desc in this collector, add it to
             // the collector_id.
@@ -63,9 +68,11 @@ impl RegistryCore {
                 // The set did have this value present, false is returned.
                 //
                 // TODO: Should we allow duplicate descs within the same collector?
-                return Err(Error::Msg(format!("a duplicate descriptor within the same \
-                                               collector the same fully-qualified name: {:?}",
-                                              desc.fq_name)));
+                return Err(Error::Msg(format!(
+                    "a duplicate descriptor within the same \
+                     collector the same fully-qualified name: {:?}",
+                    desc.fq_name
+                )));
             }
         }
 
@@ -90,7 +97,9 @@ impl RegistryCore {
         }
 
         if self.colloctors_by_id.remove(&collector_id).is_none() {
-            return Err(Error::Msg(format!("collector {:?} is not registered", c.desc())));
+            return Err(Error::Msg(
+                format!("collector {:?} is not registered", c.desc()),
+            ));
         }
 
         // dim_hashes_by_name is left untouched as those must be consistent
@@ -180,7 +189,9 @@ impl Default for Registry {
             desc_ids: HashSet::new(),
         };
 
-        Registry { r: Arc::new(RwLock::new(r)) }
+        Registry {
+            r: Arc::new(RwLock::new(r)),
+        }
     }
 }
 
@@ -274,7 +285,7 @@ mod tests {
     use std::collections::HashMap;
 
     use counter::{Counter, CounterVec};
-    use metrics::{Opts, Collector};
+    use metrics::{Collector, Opts};
     use desc::Desc;
     use proto;
 
@@ -300,8 +311,8 @@ mod tests {
         assert!(r.unregister(Box::new(counter.clone())).is_ok());
         assert!(r.unregister(Box::new(counter.clone())).is_err());
 
-        let counter_vec = CounterVec::new(Opts::new("test_vec", "test vec help"), &["a", "b"])
-            .unwrap();
+        let counter_vec =
+            CounterVec::new(Opts::new("test_vec", "test vec help"), &["a", "b"]).unwrap();
 
         r.register(Box::new(counter_vec.clone())).unwrap();
         counter_vec.with_label_values(&["1", "2"]).inc();
@@ -336,7 +347,9 @@ mod tests {
         assert_eq!(mfs[2].get_name(), "test_b_counter");
 
         let r = Registry::new();
-        let opts = Opts::new("test", "test help").const_label("a", "1").const_label("b", "2");
+        let opts = Opts::new("test", "test help")
+            .const_label("a", "1")
+            .const_label("b", "2");
         let counter_vec = CounterVec::new(opts, &["cc", "c1", "a2", "c0"]).unwrap();
         r.register(Box::new(counter_vec.clone())).unwrap();
 
@@ -415,10 +428,13 @@ mod tests {
 
     #[test]
     fn test_register_multiplecollector() {
-        let counters = vec![Counter::new("c1", "c1 is a counter").unwrap(),
-                            Counter::new("c2", "c2 is a counter").unwrap()];
+        let counters = vec![
+            Counter::new("c1", "c1 is a counter").unwrap(),
+            Counter::new("c2", "c2 is a counter").unwrap(),
+        ];
 
-        let descs = counters.iter()
+        let descs = counters
+            .iter()
             .map(|c| c.desc().into_iter().cloned())
             .fold(Vec::new(), |mut acc, ds| {
                 acc.extend(ds);

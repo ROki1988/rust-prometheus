@@ -20,7 +20,7 @@ pub use self::atomic::{AtomicF64, AtomicU64};
 
 #[cfg(not(feature = "nightly"))]
 mod rwlock {
-    use std::sync::RwLock;
+    use spin::RwLock;
 
     pub struct RwlockF64 {
         inner: RwLock<f64>,
@@ -28,22 +28,24 @@ mod rwlock {
 
     impl RwlockF64 {
         pub fn new(val: f64) -> RwlockF64 {
-            RwlockF64 { inner: RwLock::new(val) }
+            RwlockF64 {
+                inner: RwLock::new(val),
+            }
         }
 
         #[inline]
         pub fn set(&self, val: f64) {
-            *self.inner.write().unwrap() = val;
+            *self.inner.write() = val;
         }
 
         #[inline]
         pub fn get(&self) -> f64 {
-            *self.inner.read().unwrap()
+            *self.inner.read()
         }
 
         #[inline]
         pub fn inc_by(&self, delta: f64) {
-            *self.inner.write().unwrap() += delta;
+            *self.inner.write() += delta;
         }
     }
 
@@ -53,17 +55,19 @@ mod rwlock {
 
     impl RwlockU64 {
         pub fn new(val: u64) -> RwlockU64 {
-            RwlockU64 { inner: RwLock::new(val) }
+            RwlockU64 {
+                inner: RwLock::new(val),
+            }
         }
 
         #[inline]
         pub fn get(&self) -> u64 {
-            *self.inner.read().unwrap()
+            *self.inner.read()
         }
 
         #[inline]
         pub fn inc_by(&self, delta: u64) {
-            *self.inner.write().unwrap() += delta;
+            *self.inner.write() += delta;
         }
     }
 }
@@ -79,7 +83,9 @@ mod atomic {
 
     impl AtomicF64 {
         pub fn new(val: f64) -> AtomicF64 {
-            AtomicF64 { inner: StdAtomicU64::new(f64_to_u64(val)) }
+            AtomicF64 {
+                inner: StdAtomicU64::new(f64_to_u64(val)),
+            }
         }
 
         #[inline]
@@ -120,7 +126,9 @@ mod atomic {
 
     impl AtomicU64 {
         pub fn new(val: u64) -> AtomicU64 {
-            AtomicU64 { inner: StdAtomicU64::new(val) }
+            AtomicU64 {
+                inner: StdAtomicU64::new(val),
+            }
         }
 
         #[inline]

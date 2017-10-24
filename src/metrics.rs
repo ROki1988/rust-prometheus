@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use std::collections::HashMap;
-use std::cmp::{Ord, Ordering, Eq, PartialOrd};
+use std::cmp::{Eq, Ord, Ordering, PartialOrd};
 
 use desc::{Desc, Describer};
 use errors::Result;
@@ -142,10 +142,12 @@ impl Opts {
 
 impl Describer for Opts {
     fn describe(&self) -> Result<Desc> {
-        Desc::new(self.fq_name(),
-                  self.help.clone(),
-                  self.variable_labels.clone(),
-                  self.const_labels.clone())
+        Desc::new(
+            self.fq_name(),
+            self.help.clone(),
+            self.variable_labels.clone(),
+            self.const_labels.clone(),
+        )
     }
 }
 
@@ -217,14 +219,14 @@ mod tests {
     #[test]
     fn test_build_fq_name() {
         let tbl = vec![
-        ("a", "b", "c", "a_b_c"),
-        ("", "b", "c", "b_c"),
-        ("a", "", "c", "a_c"),
-        ("", "", "c", "c"),
-        ("a", "b", "", ""),
-        ("a", "", "", ""),
-        ("", "b", "", ""),
-        (" ", "", "", ""),
+            ("a", "b", "c", "a_b_c"),
+            ("", "b", "c", "b_c"),
+            ("a", "", "c", "a_c"),
+            ("", "", "c", "c"),
+            ("a", "b", "", ""),
+            ("a", "", "", ""),
+            ("", "b", "", ""),
+            (" ", "", "", ""),
         ];
 
         for (namespace, subsystem, name, res) in tbl {

@@ -19,8 +19,8 @@ use proto::MetricFamily;
 mod text;
 mod pb;
 
-pub use self::text::{TEXT_FORMAT, TextEncoder};
-pub use self::pb::{PROTOBUF_FORMAT, ProtobufEncoder};
+pub use self::text::{TextEncoder, TEXT_FORMAT};
+pub use self::pb::{ProtobufEncoder, PROTOBUF_FORMAT};
 
 /// `Encoder` types encode metric families into an underlying wire protocol.
 pub trait Encoder {

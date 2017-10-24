@@ -12,17 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::collections::HashMap;
 use std::hash::Hasher;
 
 use fnv::FnvHasher;
 use protobuf::RepeatedField;
+use spin::RwLock;
 
-use desc::{Describer, Desc};
+use desc::{Desc, Describer};
 use metrics::{Collector, Metric};
 use proto::{MetricFamily, MetricType};
-use errors::{Result, Error};
+use errors::{Error, Result};
 
 /// `MetricVecBuilder` is the trait to build a metric.
 pub trait MetricVecBuilder: Send + Sync + Clone {
@@ -48,7 +49,7 @@ impl<T: MetricVecBuilder> MetricVecCore<T> {
         m.set_help(self.desc.help.clone());
         m.set_field_type(self.metric_type);
 
-        let children = self.children.read().unwrap();
+        let children = self.children.read();
         let mut metrics = Vec::with_capacity(children.len());
         for child in children.values() {
             metrics.push(child.metric());
@@ -60,7 +61,7 @@ impl<T: MetricVecBuilder> MetricVecCore<T> {
     pub fn get_metric_with_label_values(&self, vals: &[&str]) -> Result<T::M> {
         let h = try!(self.hash_label_values(vals));
 
-        if let Some(metric) = self.children.read().unwrap().get(&h).cloned() {
+        if let Some(metric) = self.children.read().get(&h).cloned() {
             return Ok(metric);
         }
 
@@ -70,7 +71,7 @@ impl<T: MetricVecBuilder> MetricVecCore<T> {
     pub fn get_metric_with(&self, labels: &HashMap<&str, &str>) -> Result<T::M> {
         let h = try!(self.hash_labels(labels));
 
-        if let Some(metric) = self.children.read().unwrap().get(&h).cloned() {
+        if let Some(metric) = self.children.read().get(&h).cloned() {
             return Ok(metric);
         }
 
@@ -81,7 +82,7 @@ impl<T: MetricVecBuilder> MetricVecCore<T> {
     pub fn delete_label_values(&self, vals: &[&str]) -> Result<()> {
         let h = try!(self.hash_label_values(vals));
 
-        let mut children = self.children.write().unwrap();
+        let mut children = self.children.write();
         if children.remove(&h).is_none() {
             return Err(Error::Msg(format!("missing label values {:?}", vals)));
         }
@@ -92,7 +93,7 @@ impl<T: MetricVecBuilder> MetricVecCore<T> {
     pub fn delete(&self, labels: &HashMap<&str, &str>) -> Result<()> {
         let h = try!(self.hash_labels(labels));
 
-        let mut children = self.children.write().unwrap();
+        let mut children = self.children.write();
         if children.remove(&h).is_none() {
             return Err(Error::Msg(format!("missing labels {:?}", labels)));
         }
@@ -102,12 +103,15 @@ impl<T: MetricVecBuilder> MetricVecCore<T> {
 
     /// `reset` deletes all metrics in this vector.
     pub fn reset(&self) {
-        self.children.write().unwrap().clear();
+        self.children.write().clear();
     }
 
     fn hash_label_values(&self, vals: &[&str]) -> Result<u64> {
         if vals.len() != self.desc.variable_labels.len() {
-            return Err(Error::InconsistentCardinality(self.desc.variable_labels.len(), vals.len()));
+            return Err(Error::InconsistentCardinality(
+                self.desc.variable_labels.len(),
+                vals.len(),
+            ));
         }
 
         let mut h = FnvHasher::default();
@@ -120,15 +124,21 @@ impl<T: MetricVecBuilder> MetricVecCore<T> {
 
     fn hash_labels(&self, labels: &HashMap<&str, &str>) -> Result<u64> {
         if labels.len() != self.desc.variable_labels.len() {
-            return Err(Error::InconsistentCardinality(self.desc.variable_labels.len(),
-                                                      labels.len()));
+            return Err(Error::InconsistentCardinality(
+                self.desc.variable_labels.len(),
+                labels.len(),
+            ));
         }
 
         let mut h = FnvHasher::default();
         for name in &self.desc.variable_labels {
             match labels.get(&name.as_ref()) {
                 Some(val) => h.write(val.as_bytes()),
-                None => return Err(Error::Msg(format!("label name {} missing in label map", name))),
+                None => {
+                    return Err(Error::Msg(
+                        format!("label name {} missing in label map", name),
+                    ))
+                }
             }
         }
 
@@ -140,14 +150,18 @@ impl<T: MetricVecBuilder> MetricVecCore<T> {
         for name in &self.desc.variable_labels {
             match labels.get(&name.as_ref()) {
                 Some(val) => values.push(*val),
-                None => return Err(Error::Msg(format!("label name {} missing in label map", name))),
+                None => {
+                    return Err(Error::Msg(
+                        format!("label name {} missing in label map", name),
+                    ))
+                }
             }
         }
         Ok(values)
     }
 
     fn get_or_create_metric(&self, hash: u64, label_values: &[&str]) -> Result<T::M> {
-        let mut children = self.children.write().unwrap();
+        let mut children = self.children.write();
         // Check exist first.
         if let Some(metric) = children.get(&hash).cloned() {
             return Ok(metric);
@@ -294,13 +308,14 @@ mod tests {
 
     use counter::CounterVec;
     use gauge::GaugeVec;
-    use metrics::{Opts, Metric};
+    use metrics::{Metric, Opts};
 
     #[test]
     fn test_counter_vec_with_labels() {
-        let vec = CounterVec::new(Opts::new("test_couter_vec", "test counter vec help"),
-                                  &["l1", "l2"])
-            .unwrap();
+        let vec = CounterVec::new(
+            Opts::new("test_couter_vec", "test counter vec help"),
+            &["l1", "l2"],
+        ).unwrap();
 
         let mut labels = HashMap::new();
         labels.insert("l1", "v1");
@@ -327,9 +342,10 @@ mod tests {
 
     #[test]
     fn test_counter_vec_with_label_values() {
-        let vec = CounterVec::new(Opts::new("test_vec", "test counter vec help"),
-                                  &["l1", "l2"])
-            .unwrap();
+        let vec = CounterVec::new(
+            Opts::new("test_vec", "test counter vec help"),
+            &["l1", "l2"],
+        ).unwrap();
 
         assert!(vec.remove_label_values(&["v1", "v2"]).is_err());
         vec.with_label_values(&["v1", "v2"]).inc();
@@ -342,9 +358,10 @@ mod tests {
 
     #[test]
     fn test_gauge_vec_with_labels() {
-        let vec = GaugeVec::new(Opts::new("test_gauge_vec", "test gauge vec help"),
-                                &["l1", "l2"])
-            .unwrap();
+        let vec = GaugeVec::new(
+            Opts::new("test_gauge_vec", "test gauge vec help"),
+            &["l1", "l2"],
+        ).unwrap();
 
         let mut labels = HashMap::new();
         labels.insert("l1", "v1");
@@ -363,9 +380,10 @@ mod tests {
 
     #[test]
     fn test_gauge_vec_with_label_values() {
-        let vec = GaugeVec::new(Opts::new("test_gauge_vec", "test gauge vec help"),
-                                &["l1", "l2"])
-            .unwrap();
+        let vec = GaugeVec::new(
+            Opts::new("test_gauge_vec", "test gauge vec help"),
+            &["l1", "l2"],
+        ).unwrap();
 
         assert!(vec.remove_label_values(&["v1", "v2"]).is_err());
         vec.with_label_values(&["v1", "v2"]).inc();
@@ -383,9 +401,10 @@ mod tests {
 
     #[test]
     fn test_vec_get_metric_with() {
-        let vec = CounterVec::new(Opts::new("test_vec", "test counter vec help"),
-                                  &["b", "c", "a"])
-            .unwrap();
+        let vec = CounterVec::new(
+            Opts::new("test_vec", "test counter vec help"),
+            &["b", "c", "a"],
+        ).unwrap();
 
         // create a new metric that labels are {b" => "c", "c" => "a" "a" => "b"}.
         let mut labels = HashMap::new();

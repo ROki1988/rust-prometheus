@@ -18,10 +18,10 @@ extern crate hyper;
 extern crate lazy_static;
 
 use hyper::header::ContentType;
-use hyper::server::{Server, Request, Response};
+use hyper::server::{Request, Response, Server};
 use hyper::mime::Mime;
 
-use prometheus::{Counter, Gauge, HistogramVec, Encoder, TextEncoder};
+use prometheus::{Counter, Encoder, Gauge, HistogramVec, TextEncoder};
 
 lazy_static! {
     static ref HTTP_COUNTER: Counter = register_counter!(

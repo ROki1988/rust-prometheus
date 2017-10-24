@@ -15,10 +15,10 @@
 use std::sync::Arc;
 
 use proto;
-use metrics::{Opts, Collector, Metric};
+use metrics::{Collector, Metric, Opts};
 use value::{Value, ValueType};
 use desc::Desc;
-use errors::{Result, Error};
+use errors::{Error, Result};
 use vec::{MetricVec, MetricVecBuilder};
 
 /// `Counter` is a Metric that represents a single numerical value that only ever
@@ -110,8 +110,11 @@ impl CounterVec {
     pub fn new(opts: Opts, label_names: &[&str]) -> Result<CounterVec> {
         let variable_names = label_names.iter().map(|s| (*s).to_owned()).collect();
         let opts = opts.variable_labels(variable_names);
-        let metric_vec =
-            try!(MetricVec::create(proto::MetricType::COUNTER, CounterVecBuilder {}, opts));
+        let metric_vec = try!(MetricVec::create(
+            proto::MetricType::COUNTER,
+            CounterVecBuilder {},
+            opts
+        ));
 
         Ok(metric_vec as CounterVec)
     }
@@ -121,13 +124,15 @@ impl CounterVec {
 mod tests {
     use std::collections::HashMap;
 
-    use metrics::{Opts, Collector};
+    use metrics::{Collector, Opts};
 
     use super::*;
 
     #[test]
     fn test_counter() {
-        let opts = Opts::new("test", "test help").const_label("a", "1").const_label("b", "2");
+        let opts = Opts::new("test", "test help")
+            .const_label("a", "1")
+            .const_label("b", "2");
         let counter = Counter::with_opts(opts).unwrap();
         counter.inc();
         assert_eq!(counter.get() as u64, 1);
@@ -145,9 +150,10 @@ mod tests {
 
     #[test]
     fn test_counter_vec_with_labels() {
-        let vec = CounterVec::new(Opts::new("test_couter_vec", "test counter vec help"),
-                                  &["l1", "l2"])
-            .unwrap();
+        let vec = CounterVec::new(
+            Opts::new("test_couter_vec", "test counter vec help"),
+            &["l1", "l2"],
+        ).unwrap();
 
         let mut labels = HashMap::new();
         labels.insert("l1", "v1");
@@ -174,9 +180,10 @@ mod tests {
 
     #[test]
     fn test_counter_vec_with_label_values() {
-        let vec = CounterVec::new(Opts::new("test_vec", "test counter vec help"),
-                                  &["l1", "l2"])
-            .unwrap();
+        let vec = CounterVec::new(
+            Opts::new("test_vec", "test counter vec help"),
+            &["l1", "l2"],
+        ).unwrap();
 
         assert!(vec.remove_label_values(&["v1", "v2"]).is_err());
         vec.with_label_values(&["v1", "v2"]).inc();
